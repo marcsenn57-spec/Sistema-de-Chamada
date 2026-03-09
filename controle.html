@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Controle de Chamada</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #2c3e50; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .box { background: #34495e; padding: 25px; border-radius: 10px; display: flex; flex-direction: column; gap: 15px; width: 350px; }
+        input { padding: 12px; font-size: 1.1rem; border-radius: 5px; border: none; }
+        button { padding: 15px; font-size: 1.1rem; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; transition: 0.2s; }
+        .btn-chamar { background: #27ae60; color: white; }
+        .btn-chamar:hover { background: #2ecc71; }
+        .btn-repetir { background: #f39c12; color: white; }
+        .btn-reset { background:none; color:#e74c3c; font-size:0.7rem; cursor:pointer; border:1px solid #e74c3c; padding:5px; margin-top:10px;}
+    </style>
+</head>
+<body>
+    <h1>CONTROLE</h1>
+    <div class="box">
+        <label>Número da Sala:</label>
+        <input type="number" id="sala" value="1">
+        
+        <label>Nome do Paciente:</label>
+        <input type="text" id="nome" placeholder="Digite o nome...">
+        
+        <button class="btn-chamar" onclick="enviar(true)">CHAMAR PRÓXIMO</button>
+        <button class="btn-repetir" onclick="enviar(false)">REPETIR ATUAL</button>
+        <button class="btn-reset" onclick="resetarTudo()">ZERAR TUDO (NOVO DIA)</button>
+           </div>
+
+    <script>
+        const firebaseConfig = { 
+            apiKey: "AIzaSyAIRUwXKygto7BEaHie_9WvsrFQ9Z1m7T0",
+            databaseURL: "https://sistemasenhas-56211-default-rtdb.firebaseio.com",
+            projectId: "sistemasenhas-56211",
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function enviar(novo) {
+            const salaInput = document.getElementById('sala').value;
+            const nomeInput = document.getElementById('nome');
+            let nomeParaChamar = nomeInput.value.toUpperCase();
+            
+            let chaveSala = 'cont_sala_' + salaInput;
+            let contadorDaSala = parseInt(localStorage.getItem(chaveSala)) || 0;
+
+            if (novo) {
+                if (!nomeParaChamar) return alert("Digite o nome do paciente");
+                contadorDaSala++;
+                localStorage.setItem(chaveSala, contadorDaSala);
+                
+                nomeInput.dataset.ultimoNome = nomeParaChamar;
+                nomeInput.dataset.ultimaSenha = contadorDaSala;
+                nomeInput.value = ""; 
+            } else {
+                nomeParaChamar = nomeInput.dataset.ultimoNome;
+                contadorDaSala = nomeInput.dataset.ultimaSenha;
+                if (!nomeParaChamar) return alert("Não há chamada para repetir!");
+            }
+
+            db.ref('chamada').set({
+                nome: nomeParaChamar,
+                sala: salaInput,
+                senha: `-${String(contadorDaSala).padStart(3, '0')}`,
+                timestamp: Date.now()
+            });
+        }
+
+        function resetarTudo() {
+            if (confirm("Isso voltará todas as salas para a senha 001 e limpará a TV. Confirma?")) {
+                localStorage.clear();
+                db.ref('chamada').set({
+                    nome: "AGUARDANDO...",
+                    sala: "--",
+                    senha: "---",
+                    timestamp: Date.now()
+                }).then(() => location.reload());
+            }
+        }
+    </script>
+</body>
+</html>
