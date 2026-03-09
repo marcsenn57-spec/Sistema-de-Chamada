@@ -64,7 +64,7 @@
             db.ref('chamada').set({
                 nome: nomeParaChamar,
                 sala: salaInput,
-                senha: `-${String(contadorDaSala).padStart(3, '0')}`,
+                senha: `${String(contadorDaSala).padStart(3, '0')}`,
                 timestamp: Date.now()
             });
         }
@@ -82,4 +82,5 @@
         }
     </script>
 </body>
+
 </html>
