@@ -117,10 +117,25 @@
             document.getElementById('data').innerText = agora.toLocaleDateString('pt-BR');
         }, 1000);
 
-        window.addEventListener('click', () => { 
-            player.play(); 
-            falar(""); // Libera sintetizador
-        }, { once: true });
+       // Substitua o seu window.addEventListener('click', ...) por este:
+window.addEventListener('click', () => { 
+    // 1. Inicia o vídeo e a voz
+    player.play(); 
+    falar(""); 
+
+    // 2. Tenta colocar em TELA CHEIA
+    const elem = document.documentElement; // Pega a página inteira
+    if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+    } else if (elem.webkitRequestFullscreen) { /* Safari/Chrome antigo */
+        elem.webkitRequestFullscreen();
+    } else if (elem.msRequestFullscreen) { /* IE11 */
+        elem.msRequestFullscreen();
+    }
+
+    console.log("Sistema liberado e tela cheia ativada!");
+}, { once: true });
     </script>
 </body>
 </html>
+
