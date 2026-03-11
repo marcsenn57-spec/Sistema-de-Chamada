@@ -41,7 +41,6 @@
             <div id="nome" class="nome-paciente">AGUARDANDO...</div>
             <div class="sala-box">SALA <span id="sala">--</span></div>
         </div>
-
         <div id="area-lateral">
             <div id="relogio-container">
                 <div id="hora" style="font-size: 3rem; font-weight: bold;">00:00:00</div>
@@ -52,8 +51,10 @@
                     <source src="video1.mp4" type="video/mp4">
                 </video>
             </div>
+			<div id="container-audio">
+    <audio id="somDing" src="meu_som.mp3" preload="auto"></audio>
+</div>
         </div>
-    </div>
 
     <script>
         const firebaseConfig = { 
@@ -75,16 +76,31 @@
             player.play().catch(() => console.log("Clique na tela para liberar o vídeo"));
         };
 
-        // VOZ
-        function falar(t) {
-            window.speechSynthesis.cancel();
-            const m = new SpeechSynthesisUtterance(t);
-            m.lang = 'pt-BR';
-            m.rate = 0.9;
-            window.speechSynthesis.speak(m);
+       // --- NOVA FUNÇÃO DE VOZ COM DING ---
+        function avisarChamada(texto) {
+            const som = document.getElementById('somDing');
+            
+            // Toca o som de Ding
+            som.play().then(() => {
+                // Espera 1.5 segundos para o som terminar e começa a falar
+                setTimeout(() => {
+                    window.speechSynthesis.cancel();
+                    const m = new SpeechSynthesisUtterance(texto);
+                    m.lang = 'pt-BR';
+                    m.rate = 0.9;
+                    window.speechSynthesis.speak(m);
+                }, 3000); 
+            }).catch(e => {
+                // Se o som falhar, fala direto (segurança)
+                console.log("Som bloqueado, falando direto...");
+                window.speechSynthesis.cancel();
+                const m = new SpeechSynthesisUtterance(texto);
+                m.lang = 'pt-BR';
+                window.speechSynthesis.speak(m);
+            });
         }
 
-        // FIREBASE LISTENER
+        // --- FIREBASE LISTENER ATUALIZADO ---
         firebase.database().ref('chamada').on('value', (snapshot) => {
             const d = snapshot.val();
             if(!d) return;
@@ -102,14 +118,14 @@
                 senhaTela.innerText = "SENHA " + d.senha;
                 salaTela.innerText = d.sala;
                 
-                falar(`Senha ${d.senha}, ${d.nome}, sala ${d.sala}`);
+                // AQUI FOI SUBSTITUÍDO: de falar() para avisarChamada()
+                avisarChamada(`Senha ${d.senha}, ${d.nome}, sala ${d.sala}`);
                 
                 const box = document.getElementById('area-chamada');
                 box.classList.add('piscar');
                 setTimeout(() => box.classList.remove('piscar'), 5000);
             }
         });
-
         // RELÓGIO E CLIQUE INICIAL
         setInterval(() => {
             const agora = new Date();
@@ -117,25 +133,29 @@
             document.getElementById('data').innerText = agora.toLocaleDateString('pt-BR');
         }, 1000);
 
-       // Substitua o seu window.addEventListener('click', ...) por este:
-window.addEventListener('click', () => { 
-    // 1. Inicia o vídeo e a voz
-    player.play(); 
-    falar(""); 
+       window.addEventListener('click', () => { 
+    // 1. Libera o áudio (toca e pausa o ding rapidinho para o navegador autorizar)
+    const som = document.getElementById('somDing');
+    som.play().then(() => {
+        som.pause();
+        som.currentTime = 0;
+    }).catch(e => console.log("Erro ao liberar áudio:", e));
 
-    // 2. Tenta colocar em TELA CHEIA
-    const elem = document.documentElement; // Pega a página inteira
+    // 2. Inicia o vídeo
+    player.play(); 
+    
+    // 3. Tenta entrar em TELA CHEIA
+    const elem = document.documentElement;
     if (elem.requestFullscreen) {
         elem.requestFullscreen();
-    } else if (elem.webkitRequestFullscreen) { /* Safari/Chrome antigo */
+    } else if (elem.webkitRequestFullscreen) {
         elem.webkitRequestFullscreen();
-    } else if (elem.msRequestFullscreen) { /* IE11 */
+    } else if (elem.msRequestFullscreen) {
         elem.msRequestFullscreen();
     }
 
-    console.log("Sistema liberado e tela cheia ativada!");
+    console.log("Sistema, áudio e tela cheia liberados!");
 }, { once: true });
     </script>
 </body>
 </html>
-
