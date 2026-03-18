@@ -36,11 +36,7 @@
         #header-estabelecimento h1 { color: var(--primary); font-size: 1.8rem; margin: 0; }
 
         /* 2. CORPO CENTRAL */
-        #corpo { 
-            flex: 1; 
-            display: flex; 
-            overflow: hidden; 
-        }
+        #corpo { flex: 1; display: flex; overflow: hidden; }
 
         #area-chamada {
             flex: 1.5;
@@ -66,7 +62,6 @@
             margin-bottom: 20px;
             box-shadow: 0 6px 12px rgba(0,0,0,0.3);
             text-transform: uppercase;
-            transition: 0.3s;
         }
 
         .nome-paciente {
@@ -92,12 +87,7 @@
 
         #sala { color: #f1c40f; }
 
-        #area-lateral { 
-            flex: 1; 
-            display: flex; 
-            flex-direction: column; 
-            background: black; 
-        }
+        #area-lateral { flex: 1; display: flex; flex-direction: column; background: black; }
 
         #relogio-container { 
             height: 130px; 
@@ -143,10 +133,8 @@
             color: var(--primary);
             flex: 1;
             text-align: center;
-            box-shadow: 3px 3px 6px rgba(0,0,0,0.1);
         }
 
-        /* ANIMAÇÃO PISCAR */
         .piscar { animation: alert 0.8s infinite; }
         @keyframes alert { 0%, 100% { background-color: rgba(255,255,255,0); } 50% { background-color: rgba(241, 196, 15, 0.4); } }
     </style>
@@ -190,21 +178,18 @@
     <audio id="somDing" src="meu_som.mp3" preload="auto"></audio>
 
     <script>
-        // CONFIGURAÇÃO FIREBASE
         const firebaseConfig = { 
-            apiKey: "AIzaSyAIRUwXKygto7BEaHie_9WvsrFQ9Z1m7T0",
+             apiKey: "AIzaSyAIRUwXKygto7BEaHie_9WvsrFQ9Z1m7T0",
             databaseURL: "https://sistemasenhas-56211-default-rtdb.firebaseio.com",
             projectId: "sistemasenhas-56211",
         };
         firebase.initializeApp(firebaseConfig);
 
-        // VARIÁVEIS DE CONTROLE
         let historicoSenhas = JSON.parse(localStorage.getItem('meuHistorico')) || [];
         const playlist = ["video1.mp4", "video2.mp4", "video3.mp4"]; 
         let videoIdx = 0;
         const player = document.getElementById('meuPlayer');
 
-        // FUNÇÃO: RENDERIZAR HISTÓRICO
         function renderizarHistorico() {
             const itens = document.querySelectorAll('.item-hist');
             itens.forEach(item => item.innerText = "--");
@@ -213,7 +198,6 @@
             });
         }
 
-        // FUNÇÃO: VOZ E DING
         function avisarChamada(texto) {
             const som = document.getElementById('somDing');
             som.currentTime = 0;
@@ -233,26 +217,32 @@
             });
         }
 
-        // FIREBASE LISTENER
-      // FIREBASE LISTENER (Versão com Repetição Habilitada)
+        // FIREBASE LISTENER ÚNICO E CORRIGIDO
         firebase.database().ref('chamada').on('value', (snapshot) => {
             const d = snapshot.val();
             if(!d) return;
+
+            // 1. Comando de Limpar Histórico
+            if (d.comando === "LIMPAR_HISTORICO") {
+                historicoSenhas = [];
+                localStorage.removeItem('meuHistorico');
+                renderizarHistorico();
+                return;
+            }
 
             const nomeTela = document.getElementById('nome');
             const senhaTela = document.getElementById('senha');
             const salaTela = document.getElementById('sala');
 
-            // 1. Se for comando de limpar/aguardando
+            // 2. Se estiver aguardando
             if (d.nome === "AGUARDANDO..." || d.nome === "") {
                 nomeTela.innerText = "AGUARDANDO...";
                 senhaTela.innerText = "---";
                 salaTela.innerText = "--";
-                return; // Para aqui
+                return;
             }
 
-            // 2. Lógica para saber se deve ADICIONAR NO HISTÓRICO
-            // Só adiciona se o nome for REALMENTE diferente do que já está lá
+            // 3. Lógica do Histórico (só move se o nome mudar)
             if (d.nome !== nomeTela.innerText && nomeTela.innerText !== "AGUARDANDO...") {
                 const antiga = `${senhaTela.innerText} - SL ${salaTela.innerText}`;
                 historicoSenhas.unshift(antiga);
@@ -261,7 +251,7 @@
                 renderizarHistorico();
             }
 
-            // 3. ATUALIZA A TELA E CHAMA (Sempre executa, mesmo que o nome seja igual)
+            // 4. Atualiza a tela e chama voz
             nomeTela.innerText = d.nome;
             senhaTela.innerText = "SENHA " + d.senha;
             salaTela.innerText = d.sala;
@@ -269,35 +259,32 @@
             avisarChamada(`Senha ${d.senha}, ${d.nome}, sala ${d.sala}`);
             
             const box = document.getElementById('area-chamada');
-            box.classList.remove('piscar'); // Reseta a animação caso já esteja piscando
-            void box.offsetWidth;          // Truque para "resetar" o CSS
+            box.classList.remove('piscar'); 
+            void box.offsetWidth;          
             box.classList.add('piscar');
-            
             setTimeout(() => box.classList.remove('piscar'), 5000);
         });
 
-        // PLAYLIST CONTROLE
         player.onended = function() {
             videoIdx = (videoIdx + 1) % playlist.length;
             player.src = playlist[videoIdx];
             player.play();
         };
 
-        // RELÓGIO
         setInterval(() => {
             const agora = new Date();
             document.getElementById('hora').innerText = agora.toLocaleTimeString('pt-BR');
             document.getElementById('data').innerText = agora.toLocaleDateString('pt-BR');
         }, 1000);
 
-        // CLIQUE INICIAL (OBRIGATÓRIO PARA SOM/FULLSCREEN)
         window.addEventListener('click', () => { 
-            document.getElementById('somDing').play().then(p => { 
+            document.getElementById('somDing').play().then(() => { 
                 document.getElementById('somDing').pause(); 
             });
             player.play(); 
             const elem = document.documentElement;
-            if (elem.requestFullscreen) elem.requestFullscreen();
+            if (elem.requestFullscreen) { elem.requestFullscreen(); }
+            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
             renderizarHistorico();
         }, { once: true });
 
