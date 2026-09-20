@@ -8,7 +8,6 @@
     <style>
         body { font-family: sans-serif; background: #2c3e50; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         
-        /* Estilo do Painel de Status */
         #status-dia {
             background: #1a252f;
             width: 350px;
@@ -27,9 +26,14 @@
         input { padding: 12px; font-size: 1.1rem; border-radius: 5px; border: none; outline: none; }
         
         button { padding: 15px; font-size: 1.1rem; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; transition: 0.2s; }
-        .btn-chamar { background: #27ae60; color: white; }
-        .btn-chamar:hover { background: #2ecc71; }
-        .btn-repetir { background: #f39c12; color: white; }
+        
+        .btn-normal { background: #27ae60; color: white; }
+        .btn-normal:hover { background: #2ecc71; }
+        
+        .btn-prioridade { background: #2980b9; color: white; }
+        .btn-prioridade:hover { background: #3498db; }
+
+        .btn-repetir { background: #f39c12; color: white; margin-top: 10px;}
         
         .area-perigo { margin-top: 15px; border-top: 1px solid #455a64; padding-top: 15px; display: flex; flex-direction: column; gap: 10px; }
         .btn-reset { color:#bdc3c7; font-size:0.7rem; cursor:pointer; border:1.5px solid #000000; background: transparent; padding: 8px; }
@@ -38,7 +42,7 @@
 </head>
 <body>
 
-    <h1>PAINEL DE CONTROLE</h1>
+    <h1>CONTROLE DE CHAMADA</h1>
 
     <div id="status-dia">
         <div class="status-linha">
@@ -62,8 +66,12 @@
         <label>Nome do Paciente:</label>
         <input type="text" id="nome" placeholder="Digite o nome..." autocomplete="off">
         
-        <button class="btn-chamar" onclick="enviar(true)">CHAMAR PRÓXIMO</button>
-        <button class="btn-repetir" onclick="enviar(false)">REPETIR ATUAL</button>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <button class="btn-normal" onclick="enviar('N')">NORMAL (N)</button>
+            <button class="btn-prioridade" onclick="enviar('P')">PRIORIDADE (P)</button>
+        </div>
+
+        <button class="btn-repetir" onclick="repetir()">REPETIR ATUAL</button>
 
         <div class="area-perigo">
             <button class="btn-reset" onclick="resetarTudo()">Zerar Tudo (NOVO DIA)</button>
@@ -80,58 +88,67 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // --- FUNÇÃO PARA ATUALIZAR O STATUS NA TELA ---
         function atualizarStatus() {
-            // Atualiza Data
             const hoje = new Date().toLocaleDateString('pt-BR');
             document.getElementById('stat-data').innerText = hoje;
 
-            // Soma todas as senhas de todas as salas salvas no LocalStorage
             let total = 0;
             for (let i = 0; i < localStorage.length; i++) {
                 let chave = localStorage.key(i);
-                if (chave.startsWith('cont_sala_')) {
+                if (chave.startsWith('cont_')) {
                     total += parseInt(localStorage.getItem(chave)) || 0;
                 }
             }
             document.getElementById('stat-total').innerText = total;
         }
 
-        function enviar(novo) {
+        function enviar(tipo) {
             const salaInput = document.getElementById('sala').value;
             const nomeInput = document.getElementById('nome');
             let nomeParaChamar = nomeInput.value.toUpperCase();
             
-            let chaveSala = 'cont_sala_' + salaInput;
-            let contadorDaSala = parseInt(localStorage.getItem(chaveSala)) || 0;
+            if (!nomeParaChamar) return alert("Digite o nome do paciente");
 
-            if (novo) {
-                if (!nomeParaChamar) return alert("Digite o nome do paciente");
-                contadorDaSala++;
-                localStorage.setItem(chaveSala, contadorDaSala);
-                
-                nomeInput.dataset.ultimoNome = nomeParaChamar;
-                nomeInput.dataset.ultimaSenha = contadorDaSala;
-                nomeInput.dataset.ultimaSala = salaInput;
-                nomeInput.value = ""; 
-            } else {
-                nomeParaChamar = nomeInput.dataset.ultimoNome;
-                contadorDaSala = nomeInput.dataset.ultimaSenha;
-                if (!nomeParaChamar) return alert("Não há chamada para repetir!");
-            }
+            // Chave única para sala e tipo (Ex: cont_N_sala_1 ou cont_P_sala_1)
+            let chaveSala = `cont_${tipo}_sala_${salaInput}`;
+            let contador = parseInt(localStorage.getItem(chaveSala)) || 0;
+            contador++;
+            
+            localStorage.setItem(chaveSala, contador);
+            
+            // Formata a senha (Ex: N001 ou P001)
+            let senhaFormatada = tipo + String(contador).padStart(2, '0');
 
-            db.ref('chamada').set({
+            // Salva para a função repetir
+            localStorage.setItem('ultima_chamada', JSON.stringify({
                 nome: nomeParaChamar,
                 sala: salaInput,
-                senha: `${String(contadorDaSala).padStart(3, '0')}`,
+                senha: senhaFormatada
+            }));
+
+            enviarParaFirebase(nomeParaChamar, salaInput, senhaFormatada);
+            
+            nomeInput.value = "";
+            atualizarStatus();
+        }
+
+        function repetir() {
+            const ultima = JSON.parse(localStorage.getItem('ultima_chamada'));
+            if (!ultima) return alert("Não há chamada para repetir!");
+            enviarParaFirebase(ultima.nome, ultima.sala, ultima.senha);
+        }
+
+        function enviarParaFirebase(nome, sala, senha) {
+            db.ref('chamada').set({
+                nome: nome,
+                sala: sala,
+                senha: senha,
                 timestamp: Date.now()
             });
-
-            atualizarStatus(); // Atualiza o contador após chamar
         }
 
         function resetarTudo() {
-            if (confirm("Isso voltará todas as salas para a senha 001 e limpará a TV. Confirma?")) {
+            if (confirm("Isso voltará todos os contadores para 1 e limpará a TV. Confirma?")) {
                 localStorage.clear();
                 db.ref('chamada').set({
                     nome: "AGUARDANDO...",
@@ -151,17 +168,13 @@
                     comando: "LIMPAR_HISTORICO",
                     timestamp: Date.now() 
                 }).then(() => {
-                    alert("Comando enviado! O histórico será apagado.");
-                    setTimeout(() => {
-                        db.ref('chamada').update({ comando: "" });
-                    }, 2000);
+                    alert("Comando enviado!");
+                    setTimeout(() => db.ref('chamada').update({ comando: "" }), 2000);
                 });
             }
         }
 
-        // Inicia o status ao abrir a página
         atualizarStatus();
-
     </script>
 </body>
 </html>
