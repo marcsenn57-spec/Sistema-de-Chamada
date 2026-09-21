@@ -21,9 +21,9 @@
         .status-linha { display: flex; justify-content: space-between; margin-bottom: 5px; }
         .destaque-status { color: #2ecc71; font-weight: bold; font-size: 1.1rem; }
 
-        .box { background:  #1a252f; padding: 25px; border-radius: 10px; display: flex; flex-direction: column; gap: 15px; width: 350px; }
+        .box { background: #1a252f; padding: 25px; border-radius: 10px; display: flex; flex-direction: column; gap: 15px; width: 350px; }
         label { font-weight: bold; font-size: 0.9rem; color: #bdc3c7; }
-        input { padding: 12px; font-size: 1.1rem; border-radius: 5px; border: none; outline: none; }
+        input, select { padding: 12px; font-size: 1.1rem; border-radius: 5px; border: none; outline: none; background: white; color: #333; }
         
         button { padding: 15px; font-size: 1.1rem; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; transition: 0.2s; }
         
@@ -33,7 +33,9 @@
         .btn-prioridade { background: #2980b9; color: white; }
         .btn-prioridade:hover { background: #3498db; }
 
-        .btn-repetir { background: #f39c12; color: white; margin-top: 10px;}
+        .botoes-repetir { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
+        .btn-repetir { background: #f39c12; color: white; font-size: 0.95rem; padding: 12px 5px; }
+        .btn-repetir-anterior { background: #d35400; color: white; font-size: 0.95rem; padding: 12px 5px; }
         
         .area-perigo { margin-top: 15px; border-top: 1px solid #455a64; padding-top: 15px; display: flex; flex-direction: column; gap: 10px; }
         .btn-reset { color:#bdc3c7; font-size:0.7rem; cursor:pointer; border:1.5px solid #000000; background: transparent; padding: 8px; }
@@ -60,8 +62,17 @@
     </div>
 
     <div class="box">
-        <label>Número da Sala:</label>
-        <input type="number" id="sala" value="1">
+        <label>Local / Especialidade:</label>
+        <select id="sala">
+            <option value="1 MÉDICO">SALA 1 - MÉDICO</option>
+            <option value="2 DENTISTA">SALA 2 - DENTISTA</option>
+            <option value="3 TRIAGEM">SALA 3 - TRIAGEM</option>
+            <option value="4 ENFERMEIRA">SALA 4 - ENFERMEIRA</option>
+            <option value="5 FISIOTERAPIA">SALA 5 - FISIOTERAPIA</option>
+            <option value="6 PSICÓLOGO">SALA 6 - PSICÓLOGO</option>
+            <option value="7 VACINA">SALA 7 - VACINA</option>
+            <option value="8 ASSISTENTE SOCIAL">SALA 8 - ASSISTENTE SOCIAL</option>
+        </select>
         
         <label>Nome do Paciente:</label>
         <input type="text" id="nome" placeholder="Digite o nome..." autocomplete="off">
@@ -71,7 +82,10 @@
             <button class="btn-prioridade" onclick="enviar('P')">PRIORIDADE (P)</button>
         </div>
 
-        <button class="btn-repetir" onclick="repetir()">REPETIR ATUAL</button>
+        <div class="botoes-repetir">
+            <button class="btn-repetir" onclick="repetir('ultima')">REPETIR ATUAL</button>
+            <button class="btn-repetir-anterior" onclick="repetir('anterior')">REPETIR ANTERIOR</button>
+        </div>
 
         <div class="area-perigo">
             <button class="btn-reset" onclick="resetarTudo()">Zerar Tudo (NOVO DIA)</button>
@@ -82,8 +96,8 @@
     <script>
         const firebaseConfig = { 
           apiKey: "AIzaSyAIRUwXKygto7BEaHie_9WvsrFQ9Z1m7T0",
-            databaseURL: "https://sistemasenhas-56211-default-rtdb.firebaseio.com",
-            projectId: "sistemasenhas-56211",
+          databaseURL: "https://sistemasenhas-56211-default-rtdb.firebaseio.com",
+          projectId: "sistemasenhas-56211",
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
@@ -109,17 +123,21 @@
             
             if (!nomeParaChamar) return alert("Digite o nome do paciente");
 
-            // Chave única para sala e tipo (Ex: cont_N_sala_1 ou cont_P_sala_1)
-            let chaveSala = `cont_${tipo}_sala_${salaInput}`;
+            let chaveSala = `cont_${tipo}_sala_${salaInput.replace(/\s+/g, '_')}`;
             let contador = parseInt(localStorage.getItem(chaveSala)) || 0;
             contador++;
             
             localStorage.setItem(chaveSala, contador);
             
-            // Formata a senha (Ex: N001 ou P001)
             let senhaFormatada = tipo + String(contador).padStart(2, '0');
 
-            // Salva para a função repetir
+            // Passa a chamada atual para o registro da "anterior" antes de atualizar a nova
+            const ultimaAtual = localStorage.getItem('ultima_chamada');
+            if (ultimaAtual) {
+                localStorage.setItem('chamada_anterior', ultimaAtual);
+            }
+
+            // Salva a nova chamada como a "última"
             localStorage.setItem('ultima_chamada', JSON.stringify({
                 nome: nomeParaChamar,
                 sala: salaInput,
@@ -132,10 +150,15 @@
             atualizarStatus();
         }
 
-        function repetir() {
-            const ultima = JSON.parse(localStorage.getItem('ultima_chamada'));
-            if (!ultima) return alert("Não há chamada para repetir!");
-            enviarParaFirebase(ultima.nome, ultima.sala, ultima.senha);
+        function repetir(tipo) {
+            const chave = (tipo === 'anterior') ? 'chamada_anterior' : 'ultima_chamada';
+            const dados = JSON.parse(localStorage.getItem(chave));
+            
+            if (!dados) {
+                return alert(tipo === 'anterior' ? "Não há chamada anterior registrada!" : "Não há chamada atual para repetir!");
+            }
+            
+            enviarParaFirebase(dados.nome, dados.sala, dados.senha);
         }
 
         function enviarParaFirebase(nome, sala, senha) {
